@@ -253,9 +253,15 @@ x[1:25, 2] &lt;- x[1:25, 2] - 4</code></pre>
 </div>
 <div id="do-k-means" class="section level3">
 <h3>do K-Means</h3>
-<p><code>x</code>というデータを<code>k=2</code>でK-Means。</p>
-<p><code>nstart</code>は一番始めのクラスタリングのためにランダムサンプルする数。 小さいと局所最適に落ち込んでしまう危険があるので、著者は20か50程度の大きめの数字を推奨している。</p>
+<ul>
+<li>main function: <code>kmeans</code>
+<ul>
+<li>クラスタ数は2 (第二引数)</li>
+<li><code>nstart</code></li>
+</ul></li>
+</ul>
 <pre class="r"><code>km.out &lt;- kmeans(x, 2, nstart = 20)</code></pre>
+<p><code>nstart</code>は一番始めのクラスタリングのためにランダムサンプルする数。 小さいと局所最適に落ち込んでしまう危険があるので、著者は20か50程度の大きめの数字を推奨している。</p>
 </div>
 <div class="section level3">
 <h3>結果</h3>
