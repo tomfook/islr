@@ -1,0 +1,87 @@
+---
+title: "Chapter10 Unsupervised Learning"
+author: "Tomoya Fukumoto"
+date: "2019-05-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 10.4 Lab 1: Principal Components Analysis
+
+### Preparation
+#### Environment
+```{r import, message = FALSE}
+library(dplyr)
+library(ggplot2)
+```
+ 
+#### data
+```{r data}
+USArrests %>% as_tibble(rownames = "states")
+```
+
+### do PCA 
+
+- main function: `pcomp`
+     - `scale = TRUE`
+
+```{r pca}
+pr.out <- prcomp(USArrests, scale = TRUE)
+```
+
+主成分分析では説明変数ごとにスケールが一致していなければうまくいかない。
+`scale = TRUE`とすると自動でスケール合わせをしてくれる。
+なお、スケール合わせとは変数ごとに平均値と標準偏差を計算してそれぞれを0, 1に調整する作業のこと。
+
+### `prcomp`の結果確認
+#### loading vectorの取得
+
+全主成分についての結果が行列として帰ってくる(rotation matrix)
+```{r prcomp.loading}
+pr.out$rotation
+
+#第一主成分のloading vectorだけを取得する
+pr.out$rotation[,1]
+```
+
+#### scoreの取得
+全主成分についての結果が行列として帰ってくる。
+```{r prcomp.score}
+pr.out$x %>% as_tibble(rownames = "states")
+
+#理屈どおりか確認
+#元データとloading vectorからscoreを再現できる
+#下の計算がpro.out$x[1,1]と一致する
+alabama.scaled <- (USArrests[1,] - pr.out$center) / pr.out$scale
+sum(alabama.scaled * pr.out$rotation[,1]) 
+```
+
+### 主成分分析の可視化
+- 主成分分析の結果は符号について任意性がある
+- オプション`scale`を`TRUE`にするとscoreとスケールが合うようになる
+```{r pcr.viz, fig.width = 10, fig.asp = 1}
+biplot(pr.out, scale = 0)
+
+#loading vectorの正負を反転させてもOK
+pr.out$rotation <- - pr.out$rotation
+pr.out$x <- - pr.out$x
+biplot(pr.out, scale = 0)
+```
+
+```{r scree.plot}
+#scree plot
+pve <- pr.out$x %>% as_tibble %>% 
+  summarise_all(var) %>% 
+  tidyr::gather(key, value) %>% 
+  mutate(value = value / sum(value))  
+
+pve %>%
+  ggplot(aes(key, value)) + geom_line(aes(group = 1)) + geom_point() + ylim(0,1)
+
+pve %>% 
+  mutate(value = cumsum(value)) %>% 
+  ggplot(aes(key, value)) + geom_line(aes(group = 1)) + geom_point() + ylim(0,1)
+```
