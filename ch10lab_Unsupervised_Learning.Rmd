@@ -19,7 +19,7 @@ library(ggplot2)
 ```
  
 #### data
-```{r data}
+```{r pca.data}
 USArrests %>% as_tibble(rownames = "states")
 ```
 
@@ -85,3 +85,42 @@ pve %>%
   mutate(value = cumsum(value)) %>% 
   ggplot(aes(key, value)) + geom_line(aes(group = 1)) + geom_point() + ylim(0,1)
 ```
+
+## 10.5 Clustering, K-Means Clustering
+
+### Preparation
+#### Environment
+```{r kmeans.import, message = FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+#### data
+```{r kmeans.data}
+set.seed(2)
+x <- matrix(rnorm(50*2), ncol = 2)
+#first 25 observations are under different distribution
+x[1:25, 1] <- x[1:25, 1] + 3
+x[1:25, 2] <- x[1:25, 2] - 4
+```
+
+### do K-Means
+`x`というデータを`k=2`でK-Means。
+
+`nstart`は一番始めのクラスタリングのためにランダムサンプルする数。
+小さいと局所最適に落ち込んでしまう危険があるので、著者は20か50程度の大きめの数字を推奨している。
+```{r kmeans}
+km.out <- kmeans(x, 2, nstart = 20)
+```
+### 結果
+```{r kmeans.result}
+km.out$cluster
+x %>%
+  as_tibble %>%
+  mutate(cluster = km.out$cluster %>% factor) %>%
+  ggplot(aes(V1, V2)) + geom_point(aes(color = cluster)) 
+km.out
+```
+始めの２５個を正しくクラスタリングできているようだ。
+
+
