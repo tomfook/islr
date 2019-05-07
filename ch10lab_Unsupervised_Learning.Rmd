@@ -21,20 +21,28 @@ library(ggplot2)
 #### data
 ```{r pca.data}
 USArrests %>% as_tibble(rownames = "states")
+class(USArrests)
 ```
 
 ### do PCA 
 
-- main function: `pcomp`
+- main function: `stats::prcomp`
+     - data.frame
      - `scale = TRUE`
 
 ```{r pca}
 pr.out <- prcomp(USArrests, scale = TRUE)
 ```
 
-主成分分析では説明変数ごとにスケールが一致していなければうまくいかない。
+主成分分析では説明変数ごとにスケールが一致していなければならない。
 `scale = TRUE`とすると自動でスケール合わせをしてくれる。
 なお、スケール合わせとは変数ごとに平均値と標準偏差を計算してそれぞれを0, 1に調整する作業のこと。
+
+第一引数にformula式を設定すればPCAする変数を指定することもできる。
+```{r pca.formula}
+prcomp(~ Murder + Assault + UrbanPop, USArrests, scale = TRUE)
+```
+
 
 ### `prcomp`の結果確認
 #### loading vectorの取得
@@ -86,7 +94,7 @@ pve %>%
   ggplot(aes(key, value)) + geom_line(aes(group = 1)) + geom_point() + ylim(0,1)
 ```
 
-## 10.5 Clustering, K-Means Clustering
+## 10.5 Clustering, K-Means
 
 ### Preparation
 #### Environment
@@ -106,8 +114,9 @@ x[1:25, 2] <- x[1:25, 2] - 4
 
 ### do K-Means
 - main function: `kmeans`
-    - クラスタ数は2 (第二引数)
-    - `nstart`
+    - メインデータは**行列**
+    - 第二引数はクラスタ数（今回は2）
+    - `nstart`は必須パラメータ(後述)
 
 ```{r kmeans}
 km.out <- kmeans(x, 2, nstart = 20)
@@ -125,5 +134,99 @@ x %>%
 km.out
 ```
 始めの２５個を正しくクラスタリングできているようだ。
+
+## lab 2: Clustering, Hierarchical
+### Preparation
+#### data
+```{r hclust.data}
+x.dist <- dist(x)
+```
+- `x`はk-meansで使ったのと同じ
+- `dist`は`x`のすべての行の組み合わせについて距離ベクトル(dist型)を返す関数。
+     - 後述の`hclust`関数は入力としてdist型を要求するので必須
+     - デフォルトでは距離はユークリッド距離だが、オプション`method`を使えば最大値距離($L^\infty$)やマンハッタン距離($L^1$)とかも選択できる 
+
+### do Hierarchical Clustering
+```{r hclust.do}
+hc.ward <- hclust(x.dist, method = "ward.D")
+hc.complete <- hclust(x.dist, method = "complete")
+hc.single <- hclust(x.dist, method = "single")
+hc.average <- hclust(x.dist, method = "average")
+```
+
+- `method`はクラスター間の距離の定義方法
+     - ward.Dはわゆるウォード法による。計算量は多いが総合的によいらしい
+     - completeはクラスターの要素ごとの距離の中で最大のもの。計算量少ない
+     - singleは最小の要素間距離。あんまり良くない
+     - averageは要素間距離の平均値
+
+### visualize hclust
+```{r hclust.viz}
+plot(hc.ward, main = "Ward", xlab = "", sub = "", cex = .9)
+plot(hc.complete, main = "Complete", xlab = "", sub = "", cex = .9)
+plot(hc.single, main = "Single", xlab = "", sub = "", cex = .9)
+plot(hc.average, main = "Average", xlab = "", sub = "", cex = .9)
+```
+
+見た目からしてSingleはよくない。
+CompleteよりもWardの方が明確に分類できている。
+
+### Analysis 
+#### `cutree`
+関数`cutree`で各要素がどのクラスタに分類されたのかというベクトルが得られる。
+`k`か`h`のどちらかを指定し、`k`ではクラスタ数、`h`ではHeightでの分類結果を得る。
+
+```{r cutree}
+cutree(hc.ward, k = 2)
+cutree(hc.ward, h = 20)
+```
+
+これを使ってクラスタリング結果の精度を検証する。
+
+```{r hclust.check}
+colSums(matrix(cutree(hc.ward, k = 2) , ncol = 2) == c(rep(1,25), rep(2,25)))
+colSums(matrix(cutree(hc.complete, k = 2) , ncol = 2) == c(rep(1,25), rep(2,25)))
+colSums(matrix(cutree(hc.single, k = 2) , ncol = 2) == c(rep(1,25), rep(2,25)))
+colSums(matrix(cutree(hc.average, k = 2) , ncol = 2) == c(rep(1,25), rep(2,25)))
+```
+
+Completeは100点満点なのに対してward, averageは一部間違っている。
+singleはポンコツ
+
+```{r hclust.res.viz}
+as_tibble(x) %>%
+  mutate(
+    actlabel = c(rep(1,25), rep(2,25)) %>% factor,
+    hclust.ward = cutree(hc.ward, k = 2) %>% factor
+  ) %>%
+  ggplot(aes(V1, V2)) +
+    geom_point(aes(color = actlabel, shape = hclust.ward)) 
+```
+
+#### スケール合わせ
+要素間の距離をユークリッド距離で定義していると、変数ごとの絶対値の大きさがクラスタリングの結果に影響する。
+この影響が好ましくない場合はスケール合わせをする必要がある。
+
+```{r hclust.scale} 
+hc.ward.scaled <- x %>% scale %>% dist %>% hclust(method = "ward.D") 
+plot(hc.ward.scaled)
+colSums(matrix(cutree(hc.ward.scaled, k = 2) , ncol = 2) == c(rep(1,25), rep(2,25)))
+```
+ウォード法についてはあまり変化なし
+
+#### 距離の定義変更(correlation-based distance) 
+距離をノルムではなく相関で定義することもできる。
+ノルムを使うと絶対値の近さが距離を表すが、相関を使うと変数間の傾向が近さを表すので絶対値の差に影響を受けにくくなる。
+
+変数は３つ以上でなければ相関が計算できない。
+
+```{r hclust.cor}
+x <- matrix(rnorm(30*3), ncol = 3)
+dd <- as.dist(1 - cor(t(x)))
+plot(hclust(dd, method = "complete"), main = "Complete Linkage with Correlation-Based Distance", xlab = "", sub = "")
+```
+
+
+
 
 
